@@ -13,6 +13,9 @@ const fakeCkbProvider = {
   enable() {
     window.postMessage({ target: 'NEXUS_INPAGE' });
   },
+  createUser(user: { name: string; age: number }) {
+    window.postMessage({ target: '/users/create', user });
+  },
   getLiveCells() {
     return new Promise((resolve) => setTimeout(() => resolve([]), 200));
   },
