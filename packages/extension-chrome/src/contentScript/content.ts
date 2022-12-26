@@ -1,5 +1,4 @@
-import { sendMessage } from 'webext-bridge';
-import { Client } from 'chomex';
+import { messageListeners } from './listener';
 
 function injectScript(): void {
   const script = document.createElement('script');
@@ -10,15 +9,7 @@ function injectScript(): void {
 }
 
 window.addEventListener('message', (event) => {
-  if (event.data.target === 'NEXUS_INPAGE') {
-    sendMessage('notification', {}, 'background');
-    console.log('NEXUS_INPAGE received message from content script:', event);
-  } else if (event.data.target === '/users/create') {
-    const client = new Client(chrome.runtime);
-    client.message('/users/create', { user: event.data.user }).then((response) => {
-      console.log('NEXUS_INPAGE create user response:', response);
-    });
-  }
+  messageListeners.forEach((listener) => listener(event));
 });
 
 if (document.doctype?.name === 'html') {

@@ -6,20 +6,8 @@ import browser from 'webextension-polyfill';
 //     function openPopup(options?: unknown, callback?: () => void): void;
 //   }
 // }
-import { onMessage } from 'webext-bridge';
-
 import { Router, Model, Types } from 'chomex';
 
-onMessage('notification', async () => {
-  browser.windows.create({
-    type: 'popup',
-    focused: true,
-    left: 200,
-    width: 360,
-    height: 600,
-    url: 'popup.html',
-  });
-});
 // Define your model
 class User extends Model {
   static schema = {
@@ -36,6 +24,17 @@ router.on('/users/create', (message) => {
   const obj = message.user;
   const user = User.new(obj).save();
   return user;
+});
+
+router.on('NEXUS_INPAGE', () => {
+  browser.windows.create({
+    type: 'popup',
+    focused: true,
+    left: 200,
+    width: 360,
+    height: 600,
+    url: 'popup.html',
+  });
 });
 
 chrome.runtime.onMessage.addListener(router.listener());
