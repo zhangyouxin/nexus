@@ -1,4 +1,4 @@
-import { Configuration } from 'webpack';
+import { Configuration, ProvidePlugin } from 'webpack';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
 import * as env from './env';
 import CopyWebpackPlugin from 'copy-webpack-plugin';
@@ -12,6 +12,17 @@ const configExcludeEntry: Configuration = {
   },
   resolve: {
     extensions: ['.js', '.jsx', '.ts', '.tsx'],
+    fallback: {
+      fs: false,
+      tls: false,
+      net: false,
+      path: false,
+      zlib: false,
+      http: false,
+      https: false,
+      stream: false,
+      crypto: require.resolve('crypto-browserify'), //if you want to use this module also don't forget npm i crypto-browserify
+    },
   },
   context: env.paths.resolve('/'),
   module: {
@@ -66,6 +77,10 @@ export const pageConfig: Configuration = merge(configExcludeEntry, {
       cache: false,
     }),
     new ForkTsCheckerWebpackPlugin(),
+    new ProvidePlugin({
+      // you must `npm install buffer` to use this.
+      Buffer: ['buffer', 'Buffer'],
+    }),
   ],
 });
 
