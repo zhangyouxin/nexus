@@ -1,4 +1,4 @@
-import { sendMessage } from 'webext-bridge';
+import { messageListeners } from './listener';
 
 function injectScript(): void {
   const script = document.createElement('script');
@@ -9,9 +9,7 @@ function injectScript(): void {
 }
 
 window.addEventListener('message', (event) => {
-  if (event.data.target === 'NEXUS_INPAGE') {
-    sendMessage('notification', {}, 'background');
-  }
+  messageListeners.forEach((listener) => listener(event));
 });
 
 if (document.doctype?.name === 'html') {

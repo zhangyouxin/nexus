@@ -1,14 +1,9 @@
 import browser from 'webextension-polyfill';
+import { Router } from 'chomex';
 
-// FIXME: https://developer.chrome.com/docs/extensions/reference/action/#method-getPopup
-// declare module 'chrome' {
-//   namespace chrome.action {
-//     function openPopup(options?: unknown, callback?: () => void): void;
-//   }
-// }
-import { onMessage } from 'webext-bridge';
+const router = new Router();
 
-onMessage('notification', async () => {
+router.on('NEXUS_INPAGE', () => {
   browser.windows.create({
     type: 'popup',
     focused: true,
@@ -18,3 +13,7 @@ onMessage('notification', async () => {
     url: 'popup.html',
   });
 });
+
+export { router };
+
+chrome.runtime.onMessage.addListener(router.listener());
