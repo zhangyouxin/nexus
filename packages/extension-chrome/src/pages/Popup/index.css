@@ -1,1 +1,10 @@
 @import 'sanitize.css/sanitize.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.container {
+  margin-top: 32px;
+  width: 360px;
+  height: 600px;
+}

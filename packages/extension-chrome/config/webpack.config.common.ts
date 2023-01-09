@@ -1,4 +1,4 @@
-import { Configuration } from 'webpack';
+import { Configuration, ProvidePlugin } from 'webpack';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
 import * as env from './env';
 import CopyWebpackPlugin from 'copy-webpack-plugin';
@@ -12,7 +12,20 @@ const configExcludeEntry: Configuration = {
   },
   resolve: {
     extensions: ['.js', '.jsx', '.ts', '.tsx'],
+    fallback: {
+      fs: false,
+      buffer: require.resolve('buffer/'),
+      stream: require.resolve('stream-browserify'),
+      path: require.resolve('path-browserify'),
+      crypto: require.resolve('crypto-browserify'),
+    },
   },
+  plugins: [
+    new ProvidePlugin({
+      process: 'process/browser',
+      Buffer: ['buffer', 'Buffer'],
+    }),
+  ],
   context: env.paths.resolve('/'),
   module: {
     rules: [
@@ -31,7 +44,8 @@ const configExcludeEntry: Configuration = {
       },
       {
         test: /\.css$/,
-        use: ['style-loader', 'css-loader'],
+        exclude: /node_modules/,
+        use: ['style-loader', 'css-loader', 'postcss-loader'],
       },
       {
         test: /\.(jpe?g|png|gif|svg|ttf|woff|woff2)$/i,
