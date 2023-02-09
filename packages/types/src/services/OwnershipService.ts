@@ -1,6 +1,6 @@
-import type { BytesLike } from '@ckb-lumos/codec';
-import type { Cell, Script, Transaction } from '@ckb-lumos/lumos';
 import type { Bytes, Paginate } from '../base';
+import type { Cell, Script, Transaction } from '@ckb-lumos/lumos';
+import type { BytesLike } from '@ckb-lumos/codec';
 
 export interface OwnershipService {
   getLiveCells(payload?: GetPaginateItemsPayload): Promise<Paginate<Cell>>;
@@ -25,17 +25,17 @@ export interface OwnershipService {
   signData(payload: SignDataPayload): Promise<Signature>;
 }
 
-interface GetPaginateItemsPayload {
+export interface GetPaginateItemsPayload {
   cursor?: string;
 }
 
-interface GetUnusedLocksPayload {
+export interface GetUnusedLocksPayload {
   change?: boolean;
 }
 
-interface GetUsedLocksPayload extends GetUnusedLocksPayload, GetPaginateItemsPayload {}
+export interface GetUsedLocksPayload extends GetUnusedLocksPayload, GetPaginateItemsPayload {}
 
-interface SignTransactionPayload {
+export interface SignTransactionPayload {
   tx: Transaction;
 }
 
