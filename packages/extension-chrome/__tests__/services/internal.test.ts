@@ -2,14 +2,14 @@ import { createInternalService, FULL_OWNERSHIP_EXTERNAL_PARENT_PATH } from '../.
 import { createKeystoreService } from '../../src/services/keystore';
 import { createInMemoryStorage } from '../../src/services/storage';
 import { createConfigService } from '../../src/services/config';
+import { mockPlatformService } from '../helpers';
 
 test('internal service', async () => {
   const storage = createInMemoryStorage();
   const internalService = createInternalService({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    browser: {} as any,
     keystoreService: createKeystoreService({ storage }),
     configService: createConfigService({ storage }),
+    platformService: mockPlatformService,
   });
 
   await internalService.initWallet({
@@ -24,7 +24,7 @@ test('internal service', async () => {
   await expect(internalService.isInitialized()).resolves.toBe(true);
   await expect(Promise.resolve(keystoreService.hasInitialized())).resolves.toBe(true);
 
-  const publicKey = await keystoreService.getExtendedPublicKey({
+  const publicKey = await keystoreService.getPublicKeyByPath({
     password: '123456',
     path: FULL_OWNERSHIP_EXTERNAL_PARENT_PATH + '/0',
   });

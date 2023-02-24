@@ -26,7 +26,7 @@ export interface KeystoreService {
    * the password will be required to derive the extended public key
    * @param payload
    */
-  getExtendedPublicKey(payload: GetExtendedPublicKeyPayload): Promisable<HexString>;
+  getPublicKeyByPath(payload: GetPublicKeyPayload): Promisable<string>;
 
   /**
    *
@@ -40,7 +40,7 @@ export interface KeystoreService {
   reset(): Promisable<void>;
 }
 
-export interface GetExtendedPublicKeyPayload {
+export interface GetPublicKeyPayload {
   path: HardenedPath | NonHardenedPath;
   password?: PasswordProvider;
 }
