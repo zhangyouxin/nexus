@@ -9,6 +9,7 @@ import { HexString, Script, utils } from '@ckb-lumos/lumos';
 import { common } from '@ckb-lumos/common-scripts';
 import { Config } from '@ckb-lumos/config-manager';
 import { Signature, SignDataPayload } from '@nexus-wallet/types/lib/services/OwnershipService';
+import { transactionSkeletonToObject } from '@ckb-lumos/helpers';
 
 export function createFullOwnershipService({
   storage,
@@ -94,14 +95,15 @@ export function createFullOwnershipService({
       };
     },
     signTransaction: async ({ tx }) => {
-      const { password } = await platformService.requestSignTransaction({ tx });
-
       const backend = await backendProvider.resolve();
       const db = await getDb();
-
       let txSkeleton = await backend.resolveTx(tx);
-
       txSkeleton = common.prepareSigningEntries(txSkeleton, { config: await getLumosConfig() });
+
+      const { password } = await platformService.requestSignTransaction({
+        tx: transactionSkeletonToObject(txSkeleton),
+      });
+
       const signatures = await Promise.all(
         txSkeleton
           .get('signingEntries')
