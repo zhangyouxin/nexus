@@ -2,6 +2,9 @@ import { Cell, HexString, Script, Transaction } from '@ckb-lumos/lumos';
 import { BytesLike } from '@ckb-lumos/codec';
 import { Paginate } from './base';
 
+// TODO: uncomment me when it can be typed corretly
+// export type { RpcClient, EventClient, InjectedCkb } from '@nexus-wallet/protocol/lib/injected';
+
 export interface RpcClient {
   request(payload: { method: string; params: unknown }): PromiseLike<unknown>;
 }
