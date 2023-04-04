@@ -133,4 +133,20 @@ describe('ConfigService', () => {
 
     await expect(wrongSetConfig).rejects.toThrowError();
   });
+
+  it('should addWhiteListItem when there is none', async () => {
+    await service.getConfig();
+    await service.addWhitelistItem({ host: 'example-host1.com' });
+    const config = await service.getConfig();
+
+    await expect(config.whitelist).toEqual([{ host: 'google.com' }, { host: 'example-host1.com' }]);
+  });
+
+  it('should not addWhiteListItem when there the host exists', async () => {
+    await service.getConfig();
+    await service.addWhitelistItem({ host: 'google.com' });
+    const config = await service.getConfig();
+
+    await expect(config.whitelist).toEqual([{ host: 'google.com' }]);
+  });
 });
