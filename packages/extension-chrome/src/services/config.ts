@@ -106,8 +106,10 @@ export function createConfigService(payload: {
     addNetwork: /* istanbul ignore next */ (payload) => {
       return setConfig((draft) => draft.networks.push(payload.network));
     },
-    addWhitelistItem: /* istanbul ignore next */ (host) => {
-      return setConfig((draft) => draft.whitelist.push(host));
+    addWhitelistItem: /* istanbul ignore next */ ({ host }) => {
+      return setConfig(
+        (draft) => !draft.whitelist.find((item) => item.host === host) && draft.whitelist.push({ host }),
+      );
     },
     getNetworks: /* istanbul ignore next */ () => {
       return getConfig().then((draft) => draft.networks);

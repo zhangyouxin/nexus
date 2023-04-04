@@ -32,7 +32,7 @@ addMethod('wallet_enable', async (_, { getRequesterAppInfo, resolveService }) =>
     errors.throwError('User has rejected');
   }
 
-  await configService.addWhitelistItem({ host: host });
+  await configService.addWhitelistItem({ host });
   return { nickname: await configService.getNickname() };
 });
 
