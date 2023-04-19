@@ -6,7 +6,7 @@ import { asserts, errors } from '@nexus-wallet/utils';
 import { FULL_OWNERSHIP_EXTERNAL_PARENT_PATH, FULL_OWNERSHIP_INTERNAL_PARENT_PATH } from './constants';
 import { CellCursor, decodeCursor, encodeCursor } from './cursor';
 import { BackendProvider } from './backend';
-import { Script, utils } from '@ckb-lumos/lumos';
+import { Hash, Script, Transaction, utils } from '@ckb-lumos/lumos';
 import { common } from '@ckb-lumos/common-scripts';
 import { Config } from '@ckb-lumos/config-manager';
 import { GroupedSignature, SIGN_DATA_MAGIC } from '@nexus-wallet/protocol';
@@ -98,6 +98,10 @@ export function createFullOwnershipService({
         cursor: nextStartInfoId,
         objects: onChainLockInfos.map((info) => info.lock),
       };
+    },
+    sendTransaction: async (tx: Transaction): Promise<Hash> => {
+      const backend = await backendProvider.resolve();
+      return backend.sendTransaction(tx);
     },
     signTransaction: async ({ tx }) => {
       const backend = await backendProvider.resolve();

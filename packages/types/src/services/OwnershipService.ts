@@ -1,5 +1,5 @@
 import type { RequesterInfo } from '../base';
-import type { Cell, Script } from '@ckb-lumos/lumos';
+import type { Cell, Script, Transaction, Hash } from '@ckb-lumos/lumos';
 import type { BytesLike } from '@ckb-lumos/codec';
 import { FullOwnership, GroupedSignature, Paginate, Signature } from '@nexus-wallet/protocol';
 import { OmitPrefix } from '../helpers';
@@ -19,6 +19,8 @@ export interface OwnershipService {
    * @param payload
    */
   signTransaction(payload: SignTransactionPayload): Promise<GroupedSignature>;
+
+  sendTransaction(payload: Transaction): Promise<Hash>;
 
   /**
    * sign binary data

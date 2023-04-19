@@ -1,9 +1,10 @@
 import { List, Set } from 'immutable';
-import { values, blockchain, Transaction, Cell, Script, OutPoint, utils } from '@ckb-lumos/base';
+import { values, blockchain, Transaction, Cell, Script, utils } from '@ckb-lumos/base';
 import { RPC } from '@ckb-lumos/rpc';
 import { RPC as RpcType } from '@ckb-lumos/rpc/lib/types/rpc';
 import { createRpcClient } from './backendUtils';
 import isEqual from 'lodash.isequal';
+import { TransactionManagerDb } from '../storage';
 
 function defaultLogger(level: string, message: string) {
   console.log(`[${level}] ${message}`);
@@ -11,6 +12,7 @@ function defaultLogger(level: string, message: string) {
 
 type Props = {
   rpcUrl: string;
+  txManagerDb: TransactionManagerDb;
   options?: {
     pollIntervalSeconds?: number;
   };
@@ -43,29 +45,26 @@ interface TransactionManager {
 }
 
 export class DefaultTransactionManager implements TransactionManager {
-  transactions: Set<Transaction> = Set();
-  spentCellOutpoints: Set<OutPoint> = Set();
-  createdCells: List<Cell> = List();
   logger: typeof defaultLogger;
   running: boolean;
   pollIntervalSeconds: number;
   rpc: RPC;
   client: RPCClient;
+  txManagerDb: TransactionManagerDb;
   constructor(payload: Props) {
     this.rpc = new RPC(payload.rpcUrl);
     this.logger = defaultLogger;
     this.running = false;
     this.pollIntervalSeconds = payload?.options?.pollIntervalSeconds || 10;
     this.client = createRpcClient(payload.rpcUrl);
+    this.txManagerDb = payload.txManagerDb;
     defaultLogger('info', 'TransactionManager created!');
   }
-  getCells(locks: Script[]): Promise<Cell[]> {
-    return Promise.resolve(
-      this.createdCells
-        .toArray()
-        .filter((cell) =>
-          locks.some((lock) => isEqual(utils.computeScriptHash(cell.cellOutput.lock), utils.computeScriptHash(lock))),
-        ),
+
+  async getCells(locks: Script[]): Promise<Cell[]> {
+    const cells = await this.txManagerDb.getCreatedCells();
+    return cells.filter((cell) =>
+      locks.some((lock) => isEqual(utils.computeScriptHash(cell.cellOutput.lock), utils.computeScriptHash(lock))),
     );
   }
 
@@ -96,7 +95,8 @@ export class DefaultTransactionManager implements TransactionManager {
 
   private async _checkTransactions(): Promise<void> {
     let filteredTransactions = Set<Transaction>();
-    for await (let transactionValue of this.transactions) {
+    const txs = await this.txManagerDb.getTransactions();
+    for await (let transactionValue of txs) {
       /* Extract tx value from TransactionValue wrapper */
       let tx = transactionValue;
       /* First, remove all transactions that use already spent cells */
@@ -121,9 +121,9 @@ export class DefaultTransactionManager implements TransactionManager {
       }
       filteredTransactions = filteredTransactions.add(transactionValue);
     }
-    this.transactions = filteredTransactions;
+    await this.txManagerDb.setTransactions(filteredTransactions.toArray());
     let createdCells = List<Cell>();
-    this.transactions.forEach((transactionValue) => {
+    filteredTransactions.forEach((transactionValue) => {
       const tx = transactionValue;
       tx.outputs.forEach((output, i) => {
         const outPoint = {
@@ -137,13 +137,15 @@ export class DefaultTransactionManager implements TransactionManager {
         });
       });
     });
-    this.createdCells = createdCells;
+    await this.txManagerDb.setCreatedCells(createdCells.toArray());
   }
 
   async sendTransaction(tx: Transaction): Promise<string> {
+    // check if the input tx is valid
     blockchain.Transaction.pack(tx);
+    const spentCellOutpoints = await this.txManagerDb.getSpentCellOutpoints();
     tx.inputs.forEach((input) => {
-      if (this.spentCellOutpoints.some((spentCell) => isEqual(spentCell, input.previousOutput))) {
+      if (spentCellOutpoints.some((spentCell) => isEqual(spentCell, input.previousOutput))) {
         throw new Error(
           `OutPoint ${input.previousOutput.txHash}@${input.previousOutput.index} has already been spent!`,
         );
@@ -151,16 +153,18 @@ export class DefaultTransactionManager implements TransactionManager {
     });
     const txHash = await this.rpc.sendTransaction(tx);
     tx.hash = txHash;
-    this.transactions = this.transactions.add(tx);
-    tx.inputs.forEach((input) => {
-      this.spentCellOutpoints = this.spentCellOutpoints.add(input.previousOutput);
+    await this.txManagerDb.addTransaction(tx);
+    const addSpentCells = tx.inputs.map((input) => {
+      return this.txManagerDb.addSpentCellOutpoint(input.previousOutput);
     });
+    await Promise.all(addSpentCells);
+
     for (let i = 0; i < tx.outputs.length; i++) {
       const op = {
         txHash: txHash,
         index: `0x${i.toString(16)}`,
       };
-      this.createdCells = this.createdCells.push({
+      await this.txManagerDb.addCreatedCell({
         outPoint: op,
         cellOutput: tx.outputs[i],
         data: tx.outputsData[i],
