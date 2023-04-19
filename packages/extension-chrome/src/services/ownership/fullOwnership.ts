@@ -6,7 +6,7 @@ import { asserts, errors } from '@nexus-wallet/utils';
 import { FULL_OWNERSHIP_EXTERNAL_PARENT_PATH, FULL_OWNERSHIP_INTERNAL_PARENT_PATH } from './constants';
 import { CellCursor, decodeCursor, encodeCursor } from './cursor';
 import { BackendProvider } from './backend';
-import { Script, utils } from '@ckb-lumos/lumos';
+import { Hash, Script, Transaction, utils } from '@ckb-lumos/lumos';
 import { common } from '@ckb-lumos/common-scripts';
 import { Config } from '@ckb-lumos/config-manager';
 import { GroupedSignature, SIGN_DATA_MAGIC } from '@nexus-wallet/protocol';
@@ -45,8 +45,11 @@ export function createFullOwnershipService({
     getLiveCells: async ({ cursor: encodedCursor, change } = {}) => {
       const db = await getDb();
       const backend = await backendProvider.resolve();
-
       const infos = await db.getAll();
+
+      let allLockInfos = infos.filter(filterByChange(change));
+      const freshCells = await backend.getFreshCells(allLockInfos.map((info) => info.lock));
+      console.log('[fullOwnershipService] freshCells', freshCells);
 
       const queryCursor: CellCursor = encodedCursor ? decodeCursor(encodedCursor) : { indexerCursor: '', localId: 0 };
 
@@ -70,11 +73,14 @@ export function createFullOwnershipService({
       });
       if (!lastLock) {
         asserts.asserts(!objects.length, "Can't find last lock when cells are returned");
-        return { objects, cursor };
+        return { objects: [...freshCells, ...objects], cursor };
       }
       const lastLockInfo = infos.find((info) => info.scriptHash === utils.computeScriptHash(lastLock));
       asserts.asserts(lastLockInfo, 'no lastLockInfo found');
-      return { objects, cursor: encodeCursor({ indexerCursor: cursor, localId: lastLockInfo.id }) };
+      return {
+        objects: [...freshCells, ...objects],
+        cursor: encodeCursor({ indexerCursor: cursor, localId: lastLockInfo.id }),
+      };
     },
 
     getOnChainLocks: async ({ change, cursor: infoIdStr }) => {
@@ -98,6 +104,10 @@ export function createFullOwnershipService({
         cursor: nextStartInfoId,
         objects: onChainLockInfos.map((info) => info.lock),
       };
+    },
+    sendTransaction: async (tx: Transaction): Promise<Hash> => {
+      const backend = await backendProvider.resolve();
+      return backend.sendTransaction(tx);
     },
     signTransaction: async ({ tx }) => {
       const backend = await backendProvider.resolve();

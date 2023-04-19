@@ -63,3 +63,8 @@ addMethod('wallet_fullOwnership_signTransaction', async (payload, { getRequester
   return await fullOwnershipService.signTransaction({ ...payload, ...requesterInfo });
 });
 addMethodValidator('wallet_fullOwnership_signTransaction', ZSignTransactionPayload);
+
+addMethod('wallet_fullOwnership_sendTransaction', async (payload, { resolveService }) => {
+  const fullOwnershipService = await resolveService('fullOwnershipService');
+  return await fullOwnershipService.sendTransaction(payload.tx);
+});

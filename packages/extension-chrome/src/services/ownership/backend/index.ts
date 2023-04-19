@@ -1,7 +1,7 @@
-import { Cell, Script, Transaction } from '@ckb-lumos/lumos';
+import { Cell, Hash, Script, Transaction } from '@ckb-lumos/lumos';
 import type { ConfigService, Paginate, Promisable } from '@nexus-wallet/types';
 import { asserts } from '@nexus-wallet/utils';
-import { NetworkId } from '../storage';
+import { NetworkId, TransactionManagerDb, TxManagerStorage, createMagagerDb } from '../storage';
 import { createTransactionSkeleton, LiveCellFetcher, TransactionSkeletonType } from '@ckb-lumos/helpers';
 import { ScriptConfig } from '@ckb-lumos/config-manager';
 import chunk from 'lodash.chunk';
@@ -11,6 +11,7 @@ import { NexusCommonErrors } from '../../../errors';
 import { createRpcClient, loadSecp256k1ScriptDep, toCell, toQueryParam, toScript } from './backendUtils';
 import { ChainInfo } from '@ckb-lumos/base';
 import { ResultFormatter } from '@ckb-lumos/rpc';
+import { DefaultTransactionManager } from './trasactionManager';
 
 type GetLiveCellsResult = Paginate<Cell> & { lastLock?: Script };
 
@@ -31,16 +32,27 @@ export interface Backend {
   resolveTx(tx: Transaction): Promise<TransactionSkeletonType>;
 
   getBlockchainInfo(): Promise<ChainInfo>;
+
+  sendTransaction(payload: Transaction): Promise<Hash>;
+  getFreshCells(locks: Script[]): Promise<Cell[]>;
 }
 
 // TODO better make it persisted in localstorage/db
 const secp256k1Blake160ScriptInfoCache = new Map<NetworkId, ScriptConfig>();
 
-export function createBackend(_payload: { nodeUrl: string }): Backend {
+export function createBackend(_payload: { nodeUrl: string; txManagerDb: TransactionManagerDb }): Backend {
   // TODO replace with batch client when batch client supported type
   const client = createRpcClient(_payload.nodeUrl);
+  const txManager = new DefaultTransactionManager({ rpcUrl: _payload.nodeUrl, txManagerDb: _payload.txManagerDb });
+  txManager.start();
 
   return {
+    async getFreshCells(locks: Script[]): Promise<Cell[]> {
+      return await txManager.getCells(locks);
+    },
+    async sendTransaction(tx) {
+      return await txManager.sendTransaction(tx);
+    },
     getSecp256k1Blake160ScriptConfig: async ({ networkId }): Promise<ScriptConfig> => {
       let config = secp256k1Blake160ScriptInfoCache.get(networkId);
       if (!config) {
@@ -127,14 +139,19 @@ export function createBackend(_payload: { nodeUrl: string }): Backend {
           isEqual(descSearchRespCells[descSearchRespCells.length - 1], result.objects[limit - 1]),
           'desc search result not match',
         );
+
         result = {
-          objects: result.objects.slice(0, limit),
+          objects: result.objects,
           cursor: descSearchResp.last_cursor,
           lastLock,
         };
       }
 
-      return result;
+      console.log('getlivecells , result.object:', result.objects);
+      const liveCells = await txManager.filterSpentCells(result.objects);
+      console.log('after txManager.filterSpentCells', liveCells);
+      // TODO refetch if liveCells.length < limit
+      return { ...result, objects: liveCells };
     },
     resolveTx: (tx) => {
       const fetcher: LiveCellFetcher = async (outPoint) => {
@@ -177,11 +194,29 @@ export function createBackend(_payload: { nodeUrl: string }): Backend {
 type InstanceProvider<T> = { resolve: () => Promisable<T> };
 export type BackendProvider = InstanceProvider<Backend>;
 
-export function createBackendProvider({ configService }: { configService: ConfigService }): BackendProvider {
+export function createBackendProvider({
+  configService,
+  storage,
+}: {
+  configService: ConfigService;
+  storage: TxManagerStorage;
+}): BackendProvider {
+  let backendInstance: Backend | undefined;
+  async function getTxManagerDb(): Promise<TransactionManagerDb> {
+    const selectedNetwork = await configService.getSelectedNetwork();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return createMagagerDb({ storage, networkId: selectedNetwork.id });
+  }
+
   return {
     resolve: async () => {
+      if (backendInstance) {
+        return backendInstance;
+      }
+      const txManagerDb = await getTxManagerDb();
       const network = await configService.getSelectedNetwork();
-      return createBackend({ nodeUrl: network.rpcUrl });
+      backendInstance = createBackend({ nodeUrl: network.rpcUrl, txManagerDb });
+      return backendInstance;
     },
   };
 }
