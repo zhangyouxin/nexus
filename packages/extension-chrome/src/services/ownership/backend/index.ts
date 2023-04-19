@@ -11,6 +11,7 @@ import { NexusCommonErrors } from '../../../errors';
 import { createRpcClient, loadSecp256k1ScriptDep, toCell, toQueryParam, toScript } from './backendUtils';
 import { ChainInfo } from '@ckb-lumos/base';
 import { ResultFormatter } from '@ckb-lumos/rpc';
+import { DefaultTransactionManager } from './trasactionManager';
 
 type GetLiveCellsResult = Paginate<Cell> & { lastLock?: Script };
 
@@ -39,6 +40,7 @@ const secp256k1Blake160ScriptInfoCache = new Map<NetworkId, ScriptConfig>();
 export function createBackend(_payload: { nodeUrl: string }): Backend {
   // TODO replace with batch client when batch client supported type
   const client = createRpcClient(_payload.nodeUrl);
+  const txManager = new DefaultTransactionManager({ rpcUrl: _payload.nodeUrl });
 
   return {
     getSecp256k1Blake160ScriptConfig: async ({ networkId }): Promise<ScriptConfig> => {
@@ -89,6 +91,7 @@ export function createBackend(_payload: { nodeUrl: string }): Backend {
         return emptyReturnValue;
       }
 
+      const freshCells = await txManager.getCells(locks);
       const requetParams = locks.map((lock, i) => {
         if (i === 0) {
           // only first lock could use the cursor
@@ -128,7 +131,8 @@ export function createBackend(_payload: { nodeUrl: string }): Backend {
           'desc search result not match',
         );
         result = {
-          objects: result.objects.slice(0, limit),
+          // TODO return cells will be more than limit
+          objects: [...freshCells, ...result.objects.slice(0, limit)],
           cursor: descSearchResp.last_cursor,
           lastLock,
         };
