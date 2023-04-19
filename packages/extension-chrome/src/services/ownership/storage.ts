@@ -126,6 +126,8 @@ export function createMagagerDb(payload: { networkId: string; storage: TxManager
       });
     },
     addCreatedCell: async (cell) => {
+      console.log('addCreatedCell', cell);
+
       const oldStorage = await getAll();
       return storage.setItem(storageKey, {
         ...oldStorage,

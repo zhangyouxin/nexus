@@ -43,6 +43,7 @@ interface TransactionManager {
   stop(): void;
   sendTransaction(tx: Transaction): Promise<string>;
   getCells(locks: Script[]): Promise<Cell[]>;
+  filterSpentCells(cells: Cell[]): Promise<Cell[]>;
 }
 
 export class DefaultTransactionManager implements TransactionManager {
@@ -72,10 +73,16 @@ export class DefaultTransactionManager implements TransactionManager {
 
   async filterSpentCells(cells: Cell[]): Promise<Cell[]> {
     const spentCellOutpoints = await this.txManagerDb.getSpentCellOutpoints();
+    console.log(
+      'filterring spent cells, spent:',
+      spentCellOutpoints,
+      'cells:',
+      cells.map((cell) => cell.outPoint),
+    );
     return cells.filter(
       (cell) =>
         !!cell.outPoint &&
-        spentCellOutpoints.some((outpoint) =>
+        !spentCellOutpoints.some((outpoint) =>
           bytes.equal(blockchain.OutPoint.pack(outpoint), blockchain.OutPoint.pack(cell.outPoint!)),
         ),
     );

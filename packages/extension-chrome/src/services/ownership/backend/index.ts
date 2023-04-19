@@ -140,16 +140,18 @@ export function createBackend(_payload: { nodeUrl: string; txManagerDb: Transact
           'desc search result not match',
         );
 
-        const liveCells = await txManager.filterSpentCells(result.objects);
         result = {
-          // TODO refetch if liveCells.length < limit
-          objects: liveCells.slice(0, limit),
+          objects: result.objects,
           cursor: descSearchResp.last_cursor,
           lastLock,
         };
       }
 
-      return result;
+      console.log('getlivecells , result.object:', result.objects);
+      const liveCells = await txManager.filterSpentCells(result.objects);
+      console.log('after txManager.filterSpentCells', liveCells);
+      // TODO refetch if liveCells.length < limit
+      return { ...result, objects: liveCells };
     },
     resolveTx: (tx) => {
       const fetcher: LiveCellFetcher = async (outPoint) => {
