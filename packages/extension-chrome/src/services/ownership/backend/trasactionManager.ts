@@ -5,6 +5,7 @@ import { RPC as RpcType } from '@ckb-lumos/rpc/lib/types/rpc';
 import { createRpcClient } from './backendUtils';
 import isEqual from 'lodash.isequal';
 import { TransactionManagerDb } from '../storage';
+import { bytes } from '@ckb-lumos/codec';
 
 function defaultLogger(level: string, message: string) {
   console.log(`[${level}] ${message}`);
@@ -63,8 +64,20 @@ export class DefaultTransactionManager implements TransactionManager {
 
   async getCells(locks: Script[]): Promise<Cell[]> {
     const cells = await this.txManagerDb.getCreatedCells();
-    return cells.filter((cell) =>
+    const createdCells = cells.filter((cell) =>
       locks.some((lock) => isEqual(utils.computeScriptHash(cell.cellOutput.lock), utils.computeScriptHash(lock))),
+    );
+    return this.filterSpentCells(createdCells);
+  }
+
+  async filterSpentCells(cells: Cell[]): Promise<Cell[]> {
+    const spentCellOutpoints = await this.txManagerDb.getSpentCellOutpoints();
+    return cells.filter(
+      (cell) =>
+        !!cell.outPoint &&
+        spentCellOutpoints.some((outpoint) =>
+          bytes.equal(blockchain.OutPoint.pack(outpoint), blockchain.OutPoint.pack(cell.outPoint!)),
+        ),
     );
   }
 
@@ -83,6 +96,7 @@ export class DefaultTransactionManager implements TransactionManager {
   }
 
   private async _loopMonitor(): Promise<void> {
+    defaultLogger('info', 'tx manager monitor runing..');
     try {
       await this._checkTransactions();
     } catch (e) {
@@ -110,6 +124,7 @@ export class DefaultTransactionManager implements TransactionManager {
       const output = tx.outputs[0];
       if (output) {
         const txHashes = await getTxHashesByLocks(output.lock, this.client);
+        console.log('txHashes', txHashes, 'from lock:', output.lock, 'deteted');
         // remove witnesses property because it's redundant for calculating txHash
         // delete tx.witnesses;
         const targetTxHash = new values.RawTransactionValue(tx, {
@@ -145,7 +160,11 @@ export class DefaultTransactionManager implements TransactionManager {
     blockchain.Transaction.pack(tx);
     const spentCellOutpoints = await this.txManagerDb.getSpentCellOutpoints();
     tx.inputs.forEach((input) => {
-      if (spentCellOutpoints.some((spentCell) => isEqual(spentCell, input.previousOutput))) {
+      if (
+        spentCellOutpoints.some((spentCell) =>
+          bytes.equal(blockchain.OutPoint.pack(spentCell), blockchain.OutPoint.pack(input.previousOutput)),
+        )
+      ) {
         throw new Error(
           `OutPoint ${input.previousOutput.txHash}@${input.previousOutput.index} has already been spent!`,
         );

@@ -34,6 +34,7 @@ export interface Backend {
   getBlockchainInfo(): Promise<ChainInfo>;
 
   sendTransaction(payload: Transaction): Promise<Hash>;
+  getFreshCells(locks: Script[]): Promise<Cell[]>;
 }
 
 // TODO better make it persisted in localstorage/db
@@ -43,8 +44,12 @@ export function createBackend(_payload: { nodeUrl: string; txManagerDb: Transact
   // TODO replace with batch client when batch client supported type
   const client = createRpcClient(_payload.nodeUrl);
   const txManager = new DefaultTransactionManager({ rpcUrl: _payload.nodeUrl, txManagerDb: _payload.txManagerDb });
+  txManager.start();
 
   return {
+    async getFreshCells(locks: Script[]): Promise<Cell[]> {
+      return await txManager.getCells(locks);
+    },
     async sendTransaction(tx) {
       return await txManager.sendTransaction(tx);
     },
@@ -96,7 +101,6 @@ export function createBackend(_payload: { nodeUrl: string; txManagerDb: Transact
         return emptyReturnValue;
       }
 
-      const freshCells = await txManager.getCells(locks);
       const requetParams = locks.map((lock, i) => {
         if (i === 0) {
           // only first lock could use the cursor
@@ -135,9 +139,11 @@ export function createBackend(_payload: { nodeUrl: string; txManagerDb: Transact
           isEqual(descSearchRespCells[descSearchRespCells.length - 1], result.objects[limit - 1]),
           'desc search result not match',
         );
+
+        const liveCells = await txManager.filterSpentCells(result.objects);
         result = {
-          // TODO return cells will be more than limit
-          objects: [...freshCells, ...result.objects.slice(0, limit)],
+          // TODO refetch if liveCells.length < limit
+          objects: liveCells.slice(0, limit),
           cursor: descSearchResp.last_cursor,
           lastLock,
         };
@@ -193,16 +199,22 @@ export function createBackendProvider({
   configService: ConfigService;
   storage: TxManagerStorage;
 }): BackendProvider {
+  let backendInstance: Backend | undefined;
   async function getTxManagerDb(): Promise<TransactionManagerDb> {
     const selectedNetwork = await configService.getSelectedNetwork();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return createMagagerDb({ storage, networkId: selectedNetwork.id });
   }
+
   return {
     resolve: async () => {
+      if (backendInstance) {
+        return backendInstance;
+      }
       const txManagerDb = await getTxManagerDb();
       const network = await configService.getSelectedNetwork();
-      return createBackend({ nodeUrl: network.rpcUrl, txManagerDb });
+      backendInstance = createBackend({ nodeUrl: network.rpcUrl, txManagerDb });
+      return backendInstance;
     },
   };
 }

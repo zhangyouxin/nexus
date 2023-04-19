@@ -1,3 +1,4 @@
+import { Hash } from '@ckb-lumos/base';
 import type { Cell, Cursor, HexString, Paginate, Script, Signature, Transaction } from './base';
 
 export type GroupedSignature = [Script, Signature][];
@@ -398,4 +399,10 @@ export interface FullOwnership {
    * </details>
    */
   wallet_fullOwnership_signData(payload: { data: HexString; lock: Script }): Promise<Signature>;
+
+  /**
+   * send tx
+   * @param payload
+   */
+  wallet_fullOwnership_sendTransaction(payload: { tx: Transaction }): Promise<Hash>;
 }
