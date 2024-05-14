@@ -10,6 +10,7 @@ import { HexString, Script, utils } from '@ckb-lumos/lumos';
 import { common } from '@ckb-lumos/common-scripts';
 import { Config } from '@ckb-lumos/config-manager';
 import { Signature, SignDataPayload } from '@nexus-wallet/types/lib/services/OwnershipService';
+import { transactionSkeletonToObject } from '@ckb-lumos/helpers';
 
 export function createFullOwnershipService({
   storage,
